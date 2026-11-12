@@ -8,8 +8,12 @@ app.use(express.json());
 
 // CONFIGURACIÓN DE GOOGLE SHEETS
 const SPREADSHEET_ID = '1LqJSoz0hKBU9Xzeabtsn7TOdFoTIhWICzT6CtW74mEw'; // <-- Tu ID real
+const credentialsJson = process.env.GOOGLE_CREDENTIALS 
+  ? JSON.parse(process.env.GOOGLE_CREDENTIALS) 
+  : require('./credentials.json');
+
 const auth = new google.auth.GoogleAuth({
-  keyFile: 'credentials.json',
+  credentials: credentialsJson,
   scopes: ['https://www.googleapis.com/auth/spreadsheets'],
 });
 
