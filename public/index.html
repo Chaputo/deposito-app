@@ -24,13 +24,13 @@
     <div class="w-full min-w-0 max-w-md mx-auto p-4 min-h-screen pb-20">
         <!-- Título -->
         <header class="mb-4 text-center">
-            <h1 class="text-2xl font-bold text-blue-600">📦 Control de Inventario</h1>
+            <h1 class="text-2xl font-bold text-blue-600">📦 BIOSALUD - Inventario</h1>
             <p class="text-sm text-gray-500">Sistema en vivo - Depósito</p>
         </header>
 
         <!-- Buscador -->
         <div class="mb-4">
-            <input type="text" id="buscador" placeholder="Buscar por artículo, SKU o ubicación..." 
+            <input type="text" id="buscador" placeholder="Buscar por artículo, código de barras o ubicación..."
                 class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-base bg-white">
         </div>
 
@@ -90,7 +90,7 @@
 
                 const id = document.createElement('span');
                 id.className = 'min-w-0 break-all text-xs text-gray-500';
-                id.textContent = p.id ? `ID: ${p.id}` : '';
+                id.textContent = p.id ? `${p.id}` : '';
                 identificadores.appendChild(id);
 
                 const ubicacion = document.createElement('span');
