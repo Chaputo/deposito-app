@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventario Depósito</title>
+    <!-- Tailwind CSS para que se vea bien en celulares -->
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="max-w-md mx-auto p-4 min-h-screen pb-20">
+        <!-- Título -->
+        <header class="mb-4 text-center">
+            <h1 class="text-2xl font-bold text-blue-600">📦 Control de Inventario</h1>
+            <p class="text-sm text-gray-500">Sistema en vivo - Depósito</p>
+        </header>
+
+        <!-- Buscador -->
+        <div class="mb-4">
+            <input type="text" id="buscador" placeholder="Buscar por artículo, SKU o ubicación..." 
+                class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-base bg-white">
+        </div>
+
+        <!-- Contador de resultados -->
+        <div class="text-xs text-gray-500 mb-2 px-1" id="contador">Cargando productos...</div>
+
+        <!-- Lista de Productos -->
+        <div id="lista-productos" class="space-y-3">
+            <!-- Los productos se inyectan acá con JavaScript -->
+        </div>
+    </div>
+
+    <script>
+        let productosGlobales = [];
+
+        async function cargarInventario() {
+            try {
+                const res = await fetch('/api/inventario');
+                productosGlobales = await res.json();
+                mostrarProductos(productosGlobales);
+            } catch (error) {
+                document.getElementById('contador').innerText = 'Error al cargar los datos.';
+                console.error(error);
+            }
+        }
+
+        function mostrarProductos(productos) {
+            const contenedor = document.getElementById('lista-productos');
+            const contador = document.getElementById('contador');
+            contenedor.innerHTML = '';
+
+            contador.innerText = `Mostrando ${productos.length} productos`;
+
+            if (productos.length === 0) {
+                contenedor.innerHTML = '<p class="text-center text-gray-500 py-6">No se encontraron productos.</p>';
+                return;
+            }
+
+            productos.forEach(p => {
+                const card = document.createElement('div');
+                card.className = 'bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-between';
+                card.innerHTML = `
+                    <div>
+                        <div class="flex justify-between items-start mb-1">
+                            <span class="text-xs font-semibold bg-blue-100 text-blue-800 px-2 py-0.5 rounded">SKU: ${p.sku || p.id}</span>
+                            <span class="text-xs font-bold bg-green-100 text-green-800 px-2 py-0.5 rounded">📍 ${p.ubicacion || 'S/U'}</span>
+                        </div>
+                        <h2 class="font-bold text-gray-900 text-sm mt-1">${p.articulo}</h2>
+                        <p class="text-xs text-gray-500 mt-0.5">${p.subfamilia || ''} - ${p.presentacion || ''}</p>
+                    </div>
+                    <div class="mt-3 pt-3 border-t border-gray-100 flex justify-between items-center text-xs">
+                        <span class="text-gray-600">Depo: <b>${p.stockDeposito || 0}</b></span>
+                        <span class="text-gray-600">Palets: <b>${p.stockPalets || 0}</b></span>
+                        <span class="text-gray-600">Picking: <b>${p.stockPicking || 0}</b></span>
+                        <span class="font-bold text-blue-600 text-sm">Total: ${p.stockTotal || 0}</span>
+                    </div>
+                `;
+                contenedor.appendChild(card);
+            });
+        }
+
+        // Filtro de búsqueda en tiempo real
+        document.getElementById('buscador').addEventListener('input', (e) => {
+            const texto = e.target.value.toLowerCase();
+            const filtrados = productosGlobales.cases ? [] : productosGlobales.filter(p => 
+                (p.articulo && p.articulo.toLowerCase().includes(texto)) ||
+                (p.sku && p.sku.toLowerCase().includes(texto)) ||
+                (p.ubicacion && p.ubicacion.toLowerCase().includes(texto)) ||
+                (p.codigoBarra && p.codigoBarra.toLowerCase().includes(texto))
+            );
+            mostrarProductos(filtrados);
+        });
+
+        // Cargar al iniciar
+        cargarInventario();
+    </script>
+</body>
+</html>
