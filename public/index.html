@@ -98,10 +98,10 @@
                 detalles.textContent = [p.subfamilia, p.presentacion].filter(Boolean).join(' - ');
 
                 const stocks = document.createElement('div');
-                stocks.className = 'mt-3 pt-3 border-t border-gray-100 grid grid-cols-2 sm:grid-cols-4 items-center text-xs gap-2';
+                stocks.className = 'mt-3 pt-3 border-t border-gray-100 grid grid-cols-3 items-center text-xs gap-2';
                 camposStock.forEach(campo => {
                     const stock = document.createElement('span');
-                    stock.className = 'text-gray-600';
+                    stock.className = 'text-center text-gray-600';
                     stock.textContent = `${campo.etiqueta === 'Depósito' ? 'Depo' : campo.etiqueta}: `;
                     const cantidad = document.createElement('b');
                     cantidad.textContent = p[campo.clave] ?? 0;
@@ -109,7 +109,7 @@
                     stocks.appendChild(stock);
                 });
                 const total = document.createElement('span');
-                total.className = 'col-span-2 sm:col-span-1 text-right sm:text-center font-bold text-blue-600 text-sm';
+                total.className = 'col-span-3 text-left font-bold text-blue-600 text-sm';
                 total.textContent = `Total: ${p.stockTotal ?? 0}`;
                 stocks.appendChild(total);
 
