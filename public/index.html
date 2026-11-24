@@ -11,6 +11,10 @@
     <!-- Tailwind CSS para que se vea bien en celulares -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        [hidden] {
+            display: none !important;
+        }
+
         html,
         body {
             width: 100%;
@@ -19,32 +23,155 @@
         }
 
         body {
-            touch-action: pan-y;
+            touch-action: pan-x pan-y;
+        }
+
+        #plano-deposito {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(132px, 1fr));
+            min-width: 660px;
+            border: 2px solid #6b7280;
+        }
+
+        #plano-deposito > section {
+            min-width: 0;
+            border-right: 1px solid #9ca3af;
+            border-bottom: 1px solid #9ca3af;
+            padding: 0.5rem;
+        }
+
+        #plano-deposito > section:nth-child(5n) {
+            border-right: 0;
+        }
+
+        #plano-deposito > section:nth-last-child(-n + 5) {
+            border-bottom: 0;
         }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800">
 
-    <div class="w-full min-w-0 max-w-md mx-auto p-4 min-h-screen pb-20">
-        <!-- Título -->
-        <header class="mb-4 text-center">
+    <main class="w-full min-w-0 max-w-5xl mx-auto p-4 min-h-screen pb-20">
+        <header class="mb-5 text-center">
             <h1 class="text-2xl font-bold text-blue-600">📦 BIOSALUD - Inventario</h1>
             <p class="text-sm text-gray-500">Sistema en vivo - Depósito</p>
         </header>
 
-        <!-- Buscador -->
-        <div class="mb-4">
-            <input type="text" id="buscador" placeholder="Buscar por artículo, código de barras o ubicación..."
-                class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-base bg-white">
-        </div>
+        <nav class="mb-5">
+            <label for="selector-vista" class="block text-sm font-semibold text-gray-700 mb-1">Vista</label>
+            <select id="selector-vista" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm bg-white text-base focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="productos">Listado de productos</option>
+                <option value="croquis">Croquis del depósito</option>
+            </select>
+        </nav>
 
-        <!-- Contador de resultados -->
-        <div class="text-xs text-gray-500 mb-2 px-1" id="contador">Cargando productos...</div>
+        <section id="vista-productos">
+            <div class="mb-4">
+                <input type="text" id="buscador" placeholder="Buscar por artículo, código de barras o ubicación..."
+                    class="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-base bg-white">
+            </div>
+            <div class="text-xs text-gray-500 mb-2 px-1" id="contador">Cargando productos...</div>
+            <div id="lista-productos" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+        </section>
 
-        <!-- Lista de Productos -->
-        <div id="lista-productos" class="space-y-3">
-            <!-- Los productos se inyectan acá con JavaScript -->
-        </div>
+        <section id="vista-croquis" hidden>
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <div>
+                    <h2 class="text-xl font-bold text-gray-900">Croquis del depósito</h2>
+                    <p id="resumen-croquis" class="text-sm text-gray-500">Cargando ubicaciones...</p>
+                </div>
+                <div class="flex flex-wrap gap-3 rounded-lg bg-white p-3 shadow-sm">
+                    <label class="flex items-center gap-2 text-xs font-medium text-gray-700">Libre
+                        <input id="color-libre" type="color" value="#e5f5e9" aria-label="Color de lugar disponible" class="h-8 w-10 cursor-pointer rounded border border-gray-300">
+                    </label>
+                    <label class="flex items-center gap-2 text-xs font-medium text-gray-700">Ocupado
+                        <input id="color-ocupado" type="color" value="#ffe5e5" aria-label="Color de lugar ocupado" class="h-8 w-10 cursor-pointer rounded border border-gray-300">
+                    </label>
+                    <button id="abrir-visibilidad" type="button" class="rounded-lg border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50">
+                        Mostrar/ocultar lugares
+                    </button>
+                </div>
+            </div>
+            <p id="error-croquis" role="alert" class="mb-3 text-sm text-red-700" hidden></p>
+            <div class="overflow-x-auto" role="region" aria-label="Plano del depósito, desplazable horizontalmente">
+                <div id="plano-deposito"></div>
+            </div>
+            <section id="palets-sin-ubicacion" class="mt-5 rounded-xl border border-orange-200 bg-orange-50 p-4" hidden>
+                <h3 class="font-bold text-orange-900">Palets sin ubicación en el plano</h3>
+                <p class="mb-3 text-sm text-orange-800">Tocalos para asignarles un lugar válido.</p>
+                <div id="lista-sin-ubicacion" class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3"></div>
+            </section>
+        </section>
+    </main>
+
+    <div id="dialog-visibilidad" class="fixed inset-0 z-10 bg-gray-900/50 p-4 flex items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="titulo-dialog-visibilidad" hidden>
+        <section class="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
+            <div class="mb-4 flex items-start justify-between gap-3">
+                <div>
+                    <h2 id="titulo-dialog-visibilidad" class="text-lg font-bold text-gray-900">Visibilidad de lugares</h2>
+                    <p class="text-sm text-gray-500">Desmarcá los subsectores que quieras ocultar.</p>
+                </div>
+                <button id="cerrar-visibilidad" type="button" aria-label="Cerrar" class="px-2 text-xl text-gray-500 hover:text-gray-900">×</button>
+            </div>
+            <label for="sector-visibilidad" class="block text-sm font-medium text-gray-700">Sector</label>
+            <select id="sector-visibilidad" class="mb-3 mt-1 w-full rounded-lg border border-gray-300 bg-white p-2"></select>
+            <p class="mb-2 text-xs text-gray-500">Los lugares ocupados no se pueden ocultar.</p>
+            <div id="opciones-visibilidad" class="grid grid-cols-2 gap-2 sm:grid-cols-4"></div>
+            <div class="mt-4 flex justify-between gap-2">
+                <button id="mostrar-todos-sector" type="button" class="rounded-lg border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">Mostrar los 16</button>
+                <button id="cerrar-visibilidad-abajo" type="button" class="rounded-lg bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-200">Cerrar</button>
+            </div>
+        </section>
+    </div>
+
+    <div id="dialog-ubicacion" class="fixed inset-0 z-10 bg-gray-900/50 p-4 flex items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="titulo-dialog-ubicacion" hidden>
+        <section class="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
+            <div class="mb-4 flex items-start justify-between gap-3">
+                <div>
+                    <h2 id="titulo-dialog-ubicacion" class="text-lg font-bold text-gray-900"></h2>
+                    <p id="resumen-ubicacion" class="text-sm text-gray-500"></p>
+                </div>
+                <button id="cerrar-dialog-ubicacion" type="button" aria-label="Cerrar" class="px-2 text-xl text-gray-500 hover:text-gray-900">×</button>
+            </div>
+            <div id="lista-palets-ubicacion" class="mb-4 space-y-2"></div>
+            <p id="error-ubicacion" role="alert" class="mb-3 text-sm text-red-600" hidden></p>
+            <div class="flex justify-between gap-2">
+                <button id="agregar-palet-ubicacion" type="button" class="px-3 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700">+ Agregar palet</button>
+                <button id="cerrar-ubicacion" type="button" class="px-3 py-2 text-sm font-semibold text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Cerrar</button>
+            </div>
+        </section>
+    </div>
+
+    <div id="dialog-palet" class="fixed inset-0 z-10 bg-gray-900/50 p-4 flex items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="titulo-dialog-palet" hidden>
+        <form id="form-palet" class="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-xl bg-white p-5 shadow-xl space-y-4">
+            <div class="flex items-start justify-between gap-3">
+                <div>
+                    <h2 id="titulo-dialog-palet" class="text-lg font-bold text-gray-900">Editar palet</h2>
+                    <p id="identificador-palet" class="text-xs text-gray-500"></p>
+                </div>
+                <button id="cerrar-dialog-palet" type="button" aria-label="Cerrar" class="px-2 text-xl text-gray-500 hover:text-gray-900">×</button>
+            </div>
+            <label class="block text-sm font-medium text-gray-700">Lugar del plano
+                <select id="palet-seccion" required class="mt-1 w-full p-2 border border-gray-300 rounded-lg bg-white"></select>
+            </label>
+            <label class="block text-sm font-medium text-gray-700">Producto
+                <select id="palet-producto" class="mt-1 w-full p-2 border border-gray-300 rounded-lg bg-white"></select>
+            </label>
+            <label class="block text-sm font-medium text-gray-700">Cantidad
+                <input id="palet-cantidad" type="number" min="0" step="any" required class="mt-1 w-full p-2 border border-gray-300 rounded-lg">
+            </label>
+            <label class="block text-sm font-medium text-gray-700">Nota
+                <textarea id="palet-nota" maxlength="500" rows="2" class="mt-1 w-full p-2 border border-gray-300 rounded-lg"></textarea>
+            </label>
+            <p id="error-palet" role="alert" class="text-sm text-red-600" hidden></p>
+            <div class="flex flex-wrap justify-between gap-2">
+                <button id="quitar-palet" type="button" class="px-3 py-2 text-sm font-semibold text-red-700 border border-red-200 rounded-lg hover:bg-red-50" hidden>Quitar palet</button>
+                <div class="ml-auto flex gap-2">
+                    <button id="cancelar-palet" type="button" class="px-3 py-2 text-sm font-semibold text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Cancelar</button>
+                    <button id="guardar-palet" type="submit" class="px-3 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50">Guardar</button>
+                </div>
+            </div>
+        </form>
     </div>
 
     <script>
@@ -55,11 +182,23 @@
             { clave: 'stockPicking', etiqueta: 'Picking' }
         ];
 
+        async function leerRespuesta(res) {
+            const tipo = res.headers.get('content-type') || '';
+            if (!tipo.includes('application/json')) {
+                const cuerpo = await res.text();
+                if (cuerpo.trim().startsWith('<')) {
+                    throw new Error('El servidor devolvió una página HTML para la API. Reiniciá el servidor con `npm start` y volvé a cargar la página.');
+                }
+                throw new Error(cuerpo || 'El servidor devolvió una respuesta inválida.');
+            }
+            return res.json();
+        }
+
         async function cargarInventario() {
             try {
                 const res = await fetch('/api/inventario');
                 if (!res.ok) throw new Error('No se pudo cargar el inventario.');
-                productosGlobales = await res.json();
+                productosGlobales = await leerRespuesta(res);
                 filtrarProductos();
             } catch (error) {
                 document.getElementById('contador').innerText = 'Error al cargar los datos.';
@@ -209,7 +348,7 @@
                             stockPicking: entradas.stockPicking.valueAsNumber
                         })
                     });
-                    const resultado = await res.json();
+                    const resultado = await leerRespuesta(res);
                     if (!res.ok) throw new Error(resultado.error || 'No se pudieron guardar las cantidades.');
 
                     Object.assign(producto, resultado);
@@ -238,12 +377,419 @@
             mostrarProductos(filtrados);
         }
 
+        let croquisGlobal = { secciones: [], palets: [] };
+        let paletEnEdicion = null;
+        let ubicacionSeleccionada = '';
+        let desdeSinUbicacion = false;
+        const dialogPalet = document.getElementById('dialog-palet');
+        const dialogUbicacion = document.getElementById('dialog-ubicacion');
+        const sectoresDeposito = ['A', 'B', 'C'].flatMap(fila =>
+            [1, 2, 3, 4, 5].map(columna => `${fila}${columna}`)
+        );
+        const ubicacionesFijas = sectoresDeposito.flatMap(sector =>
+            Array.from({ length: 16 }, (_, index) =>
+                `${sector}-${String(index + 1).padStart(2, '0')}`
+            )
+        );
+        const subsectoresOcultos = new Set(
+            (localStorage.getItem('depositoSubsectoresOcultos') || '')
+                .split(',')
+                .filter(ubicacion => ubicacionesFijas.includes(ubicacion))
+        );
+        const coloresCroquis = {
+            libre: localStorage.getItem('depositoColorLibre') || '#e5f5e9',
+            ocupado: localStorage.getItem('depositoColorOcupado') || '#ffe5e5'
+        };
+        let sectorVisibilidadSeleccionado = 'C4';
+
+        async function cargarCroquis() {
+            const resumen = document.getElementById('resumen-croquis');
+            try {
+                const res = await fetch('/api/croquis');
+                const resultado = await leerRespuesta(res);
+                if (!res.ok) throw new Error(resultado.error || 'No se pudo cargar el croquis.');
+                croquisGlobal = resultado;
+                const ocupadas = new Set(croquisGlobal.palets.map(palet => palet.seccion));
+                const reaparecieron = Array.from(subsectoresOcultos).filter(ubicacion => ocupadas.has(ubicacion));
+                reaparecieron.forEach(ubicacion => subsectoresOcultos.delete(ubicacion));
+                if (reaparecieron.length) {
+                    guardarVisibilidad();
+                    mostrarErrorCroquis('Se mostraron de nuevo los lugares que ya tienen palets.');
+                } else {
+                    document.getElementById('error-croquis').hidden = true;
+                }
+                mostrarCroquis();
+            } catch (error) {
+                resumen.textContent = 'No se pudieron cargar las ubicaciones.';
+                mostrarErrorCroquis(error.message);
+            }
+        }
+
+        function mostrarErrorCroquis(mensaje) {
+            const error = document.getElementById('error-croquis');
+            error.textContent = mensaje;
+            error.hidden = false;
+        }
+
+        function esUbicacionFija(ubicacion) {
+            return ubicacionesFijas.includes(ubicacion);
+        }
+
+        function paletsEn(ubicacion) {
+            return croquisGlobal.palets.filter(palet => palet.seccion === ubicacion);
+        }
+
+        function nombreProducto(palet) {
+            const producto = productosGlobales.find(item => item.fila === palet.productoFila);
+            return producto ? producto.articulo : 'Sin producto asignado';
+        }
+
+        function mostrarCroquis() {
+            const plano = document.getElementById('plano-deposito');
+            const porUbicacion = new Map();
+            croquisGlobal.palets.forEach(palet => {
+                if (esUbicacionFija(palet.seccion)) {
+                    porUbicacion.set(palet.seccion, (porUbicacion.get(palet.seccion) || 0) + 1);
+                }
+            });
+            const ocupadas = porUbicacion.size;
+            const totalPalets = croquisGlobal.palets.length;
+            const visibles = ubicacionesFijas.length - subsectoresOcultos.size;
+            document.getElementById('resumen-croquis').textContent =
+                `${visibles} lugares visibles · ${ocupadas} ocupados · ${totalPalets} palets`;
+            plano.replaceChildren();
+
+            sectoresDeposito.forEach(sector => {
+                const tarjeta = document.createElement('section');
+                tarjeta.className = 'bg-white';
+                const titulo = document.createElement('h3');
+                titulo.className = 'mb-2 text-center text-sm font-bold text-gray-900';
+                titulo.textContent = sector;
+
+                const grilla = document.createElement('div');
+                grilla.className = 'grid grid-cols-4 gap-1';
+                for (let indice = 1; indice <= 16; indice += 1) {
+                    const ubicacion = `${sector}-${String(indice).padStart(2, '0')}`;
+                    if (subsectoresOcultos.has(ubicacion)) {
+                        const espacioVacio = document.createElement('div');
+                        espacioVacio.className = 'aspect-square';
+                        espacioVacio.setAttribute('aria-hidden', 'true');
+                        grilla.appendChild(espacioVacio);
+                        continue;
+                    }
+                    const cantidad = porUbicacion.get(ubicacion) || 0;
+                    const boton = document.createElement('button');
+                    boton.type = 'button';
+                    boton.className = 'aspect-square min-w-0 rounded border border-gray-300 text-xs font-bold text-gray-800 hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-blue-500';
+                    boton.style.backgroundColor = cantidad ? coloresCroquis.ocupado : coloresCroquis.libre;
+                    boton.textContent = cantidad;
+                    boton.setAttribute('aria-label', `${ubicacion}: ${cantidad} palets`);
+                    boton.title = `${ubicacion} · ${cantidad}/2 palets`;
+                    boton.addEventListener('click', () => abrirDialogUbicacion(ubicacion));
+                    grilla.appendChild(boton);
+                }
+                tarjeta.append(titulo, grilla);
+                plano.appendChild(tarjeta);
+            });
+            mostrarPaletsSinUbicacion();
+        }
+
+        function mostrarPaletsSinUbicacion() {
+            const contenedor = document.getElementById('palets-sin-ubicacion');
+            const lista = document.getElementById('lista-sin-ubicacion');
+            const palets = croquisGlobal.palets.filter(palet => !esUbicacionFija(palet.seccion));
+            contenedor.hidden = palets.length === 0;
+            lista.replaceChildren();
+            palets.forEach(palet => {
+                const boton = document.createElement('button');
+                boton.type = 'button';
+                boton.className = 'rounded-lg border border-orange-200 bg-white p-3 text-left hover:bg-orange-100';
+                const articulo = document.createElement('span');
+                articulo.className = 'block text-sm font-semibold text-gray-900';
+                articulo.textContent = nombreProducto(palet);
+                const detalle = document.createElement('span');
+                detalle.className = 'block text-xs text-gray-500';
+                detalle.textContent = `Ubicación actual: ${palet.seccion || 'sin indicar'} · ${palet.cantidad} unidades`;
+                boton.append(articulo, detalle);
+                boton.addEventListener('click', () => abrirDialogPalet(palet, '', true));
+                lista.appendChild(boton);
+            });
+        }
+
+        function abrirDialogUbicacion(ubicacion) {
+            ubicacionSeleccionada = ubicacion;
+            desdeSinUbicacion = false;
+            document.getElementById('titulo-dialog-ubicacion').textContent = `Lugar ${ubicacion}`;
+            const palets = paletsEn(ubicacion);
+            document.getElementById('resumen-ubicacion').textContent = `${palets.length} de 2 palets apilados`;
+            const lista = document.getElementById('lista-palets-ubicacion');
+            lista.replaceChildren();
+            palets.forEach((palet, index) => {
+                const boton = document.createElement('button');
+                boton.type = 'button';
+                boton.className = 'w-full rounded-lg border border-gray-200 p-3 text-left hover:bg-gray-50';
+                const nombre = document.createElement('span');
+                nombre.className = 'block text-sm font-semibold text-gray-900';
+                nombre.textContent = `Palet ${index + 1} · ${nombreProducto(palet)}`;
+                const detalle = document.createElement('span');
+                detalle.className = 'block text-xs text-gray-500';
+                detalle.textContent = `${palet.cantidad} unidades${palet.nota ? ` · ${palet.nota}` : ''}`;
+                boton.append(nombre, detalle);
+                boton.addEventListener('click', () => abrirDialogPalet(palet, ubicacion));
+                lista.appendChild(boton);
+            });
+
+            const agregar = document.getElementById('agregar-palet-ubicacion');
+            agregar.disabled = palets.length >= 2;
+            agregar.textContent = palets.length >= 2 ? 'Lugar completo (2/2)' : '+ Agregar palet';
+            document.getElementById('error-ubicacion').hidden = true;
+            dialogUbicacion.hidden = false;
+        }
+
+        function llenarSelectorUbicacion(seleccionada, ubicacionAnterior) {
+            const selector = document.getElementById('palet-seccion');
+            selector.replaceChildren();
+            const placeholder = document.createElement('option');
+            placeholder.value = '';
+            placeholder.textContent = 'Seleccioná un lugar';
+            selector.appendChild(placeholder);
+
+            sectoresDeposito.forEach(sector => {
+                const grupo = document.createElement('optgroup');
+                grupo.label = sector;
+                ubicacionesFijas.filter(ubicacion =>
+                    ubicacion.startsWith(`${sector}-`) &&
+                    (!subsectoresOcultos.has(ubicacion) || ubicacion === seleccionada || paletsEn(ubicacion).length > 0)
+                ).forEach(ubicacion => {
+                    const opcion = document.createElement('option');
+                    opcion.value = ubicacion;
+                    opcion.textContent = ubicacion;
+                    grupo.appendChild(opcion);
+                });
+                selector.appendChild(grupo);
+            });
+            if (ubicacionAnterior && !esUbicacionFija(ubicacionAnterior)) {
+                const anterior = document.createElement('option');
+                anterior.value = ubicacionAnterior;
+                anterior.textContent = `Ubicación anterior sin mapear: ${ubicacionAnterior}`;
+                selector.appendChild(anterior);
+            }
+            selector.value = seleccionada || '';
+        }
+
+        function abrirDialogPalet(palet, ubicacion, sinUbicacion = false) {
+            paletEnEdicion = palet;
+            ubicacionSeleccionada = ubicacion;
+            desdeSinUbicacion = sinUbicacion;
+            dialogUbicacion.hidden = true;
+            document.getElementById('titulo-dialog-palet').textContent = palet ? 'Editar palet' : 'Agregar palet';
+            document.getElementById('identificador-palet').textContent = palet ? `ID ${palet.id}` : '';
+            document.getElementById('quitar-palet').hidden = !palet;
+            llenarSelectorUbicacion(ubicacion || (palet && esUbicacionFija(palet.seccion) ? palet.seccion : ''), palet && palet.seccion);
+
+            const selectorProducto = document.getElementById('palet-producto');
+            selectorProducto.replaceChildren();
+            const sinProducto = document.createElement('option');
+            sinProducto.value = '';
+            sinProducto.textContent = 'Sin producto asignado';
+            selectorProducto.appendChild(sinProducto);
+            productosGlobales.forEach(producto => {
+                const opcion = document.createElement('option');
+                opcion.value = producto.fila;
+                opcion.textContent = `${producto.articulo || 'Producto'}${producto.codigoBarra ? ` · ${producto.codigoBarra}` : ''}`;
+                selectorProducto.appendChild(opcion);
+            });
+            selectorProducto.value = palet && palet.productoFila ? String(palet.productoFila) : '';
+            document.getElementById('palet-cantidad').value = palet ? palet.cantidad : 0;
+            document.getElementById('palet-nota').value = palet ? palet.nota : '';
+            document.getElementById('error-palet').hidden = true;
+            dialogPalet.hidden = false;
+            document.getElementById('palet-seccion').focus();
+        }
+
+        function cerrarDialogPalet() {
+            dialogPalet.hidden = true;
+            paletEnEdicion = null;
+            if (desdeSinUbicacion) {
+                desdeSinUbicacion = false;
+                return;
+            }
+            abrirDialogUbicacion(ubicacionSeleccionada);
+        }
+
+        async function guardarPalet(evento) {
+            evento.preventDefault();
+            const guardar = document.getElementById('guardar-palet');
+            const error = document.getElementById('error-palet');
+            guardar.disabled = true;
+            error.hidden = true;
+            const datos = {
+                seccion: document.getElementById('palet-seccion').value,
+                productoFila: document.getElementById('palet-producto').value
+                    ? Number(document.getElementById('palet-producto').value)
+                    : null,
+                cantidad: document.getElementById('palet-cantidad').valueAsNumber,
+                nota: document.getElementById('palet-nota').value
+            };
+
+            try {
+                const res = await fetch(paletEnEdicion
+                    ? `/api/palets/${encodeURIComponent(paletEnEdicion.id)}`
+                    : '/api/palets', {
+                    method: paletEnEdicion ? 'PUT' : 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(datos)
+                });
+                const resultado = await leerRespuesta(res);
+                if (!res.ok) throw new Error(resultado.error || 'No se pudo guardar el palet.');
+                dialogPalet.hidden = true;
+                paletEnEdicion = null;
+                await cargarCroquis();
+                if (!desdeSinUbicacion) abrirDialogUbicacion(datos.seccion);
+                desdeSinUbicacion = false;
+            } catch (err) {
+                error.textContent = err.message;
+                error.hidden = false;
+            } finally {
+                guardar.disabled = false;
+            }
+        }
+
+        async function quitarPalet() {
+            if (!paletEnEdicion || !window.confirm('¿Querés quitar este palet del croquis?')) return;
+            const boton = document.getElementById('quitar-palet');
+            boton.disabled = true;
+            try {
+                const res = await fetch(`/api/palets/${encodeURIComponent(paletEnEdicion.id)}`, { method: 'DELETE' });
+                if (res.status !== 204) {
+                    const resultado = await leerRespuesta(res);
+                    if (!res.ok) throw new Error(resultado.error || 'No se pudo quitar el palet.');
+                }
+                dialogPalet.hidden = true;
+                paletEnEdicion = null;
+                await cargarCroquis();
+                if (!desdeSinUbicacion) abrirDialogUbicacion(ubicacionSeleccionada);
+                desdeSinUbicacion = false;
+            } catch (error) {
+                const mensaje = document.getElementById('error-palet');
+                mensaje.textContent = error.message;
+                mensaje.hidden = false;
+            } finally {
+                boton.disabled = false;
+            }
+        }
+
+        function cambiarColor(tipo, valor) {
+            coloresCroquis[tipo] = valor;
+            localStorage.setItem(tipo === 'libre' ? 'depositoColorLibre' : 'depositoColorOcupado', valor);
+            mostrarCroquis();
+        }
+
+        function guardarVisibilidad() {
+            localStorage.setItem('depositoSubsectoresOcultos', Array.from(subsectoresOcultos).join(','));
+        }
+
+        function mostrarControlesVisibilidad() {
+            const sector = document.getElementById('sector-visibilidad').value;
+            sectorVisibilidadSeleccionado = sector;
+            const opciones = document.getElementById('opciones-visibilidad');
+            opciones.replaceChildren();
+
+            ubicacionesFijas.filter(ubicacion => ubicacion.startsWith(`${sector}-`)).forEach(ubicacion => {
+                const cantidadPalets = paletsEn(ubicacion).length;
+                const etiqueta = document.createElement('label');
+                etiqueta.className = 'flex items-center gap-2 rounded-lg border border-gray-200 p-2 text-sm';
+                const casilla = document.createElement('input');
+                casilla.type = 'checkbox';
+                casilla.checked = !subsectoresOcultos.has(ubicacion);
+                casilla.disabled = cantidadPalets > 0;
+                casilla.className = 'h-4 w-4 accent-blue-600';
+                const nombre = document.createElement('span');
+                nombre.textContent = `${ubicacion.slice(-2)}${cantidadPalets ? ' · Ocupado' : ''}`;
+                etiqueta.append(casilla, nombre);
+                casilla.addEventListener('change', () => {
+                    if (casilla.checked) subsectoresOcultos.delete(ubicacion);
+                    else subsectoresOcultos.add(ubicacion);
+                    guardarVisibilidad();
+                    mostrarCroquis();
+                    mostrarControlesVisibilidad();
+                });
+                opciones.appendChild(etiqueta);
+            });
+        }
+
+        function abrirDialogVisibilidad() {
+            const selector = document.getElementById('sector-visibilidad');
+            if (selector.options.length === 0) {
+                sectoresDeposito.forEach(sector => {
+                    const opcion = document.createElement('option');
+                    opcion.value = sector;
+                    opcion.textContent = sector;
+                    selector.appendChild(opcion);
+                });
+            }
+            selector.value = sectorVisibilidadSeleccionado;
+            mostrarControlesVisibilidad();
+            document.getElementById('dialog-visibilidad').hidden = false;
+        }
+
+        document.getElementById('selector-vista').addEventListener('change', evento => {
+            const mostrarCroquis = evento.target.value === 'croquis';
+            document.getElementById('vista-productos').hidden = mostrarCroquis;
+            document.getElementById('vista-croquis').hidden = !mostrarCroquis;
+        });
+        document.getElementById('form-palet').addEventListener('submit', guardarPalet);
+        document.getElementById('quitar-palet').addEventListener('click', quitarPalet);
+        document.getElementById('cerrar-dialog-palet').addEventListener('click', cerrarDialogPalet);
+        document.getElementById('cancelar-palet').addEventListener('click', cerrarDialogPalet);
+        document.getElementById('agregar-palet-ubicacion').addEventListener('click', () =>
+            abrirDialogPalet(null, ubicacionSeleccionada)
+        );
+        document.getElementById('cerrar-dialog-ubicacion').addEventListener('click', () => {
+            dialogUbicacion.hidden = true;
+        });
+        document.getElementById('cerrar-ubicacion').addEventListener('click', () => {
+            dialogUbicacion.hidden = true;
+        });
+        document.getElementById('color-libre').addEventListener('input', evento =>
+            cambiarColor('libre', evento.target.value)
+        );
+        document.getElementById('color-ocupado').addEventListener('input', evento =>
+            cambiarColor('ocupado', evento.target.value)
+        );
+        document.getElementById('abrir-visibilidad').addEventListener('click', abrirDialogVisibilidad);
+        document.getElementById('sector-visibilidad').addEventListener('change', mostrarControlesVisibilidad);
+        document.getElementById('mostrar-todos-sector').addEventListener('click', () => {
+            ubicacionesFijas
+                .filter(ubicacion => ubicacion.startsWith(`${sectorVisibilidadSeleccionado}-`))
+                .forEach(ubicacion => subsectoresOcultos.delete(ubicacion));
+            guardarVisibilidad();
+            mostrarCroquis();
+            mostrarControlesVisibilidad();
+        });
+        document.getElementById('cerrar-visibilidad').addEventListener('click', () => {
+            document.getElementById('dialog-visibilidad').hidden = true;
+        });
+        document.getElementById('cerrar-visibilidad-abajo').addEventListener('click', () => {
+            document.getElementById('dialog-visibilidad').hidden = true;
+        });
+        document.getElementById('color-libre').value = coloresCroquis.libre;
+        document.getElementById('color-ocupado').value = coloresCroquis.ocupado;
+        document.addEventListener('keydown', evento => {
+            if (evento.key === 'Escape' && !dialogPalet.hidden) cerrarDialogPalet();
+            else if (evento.key === 'Escape' && !document.getElementById('dialog-visibilidad').hidden) {
+                document.getElementById('dialog-visibilidad').hidden = true;
+            }
+            else if (evento.key === 'Escape' && !dialogUbicacion.hidden) dialogUbicacion.hidden = true;
+        });
+
         document.getElementById('buscador').addEventListener('input', evento => {
             filtrarProductos(evento.target.value);
         });
 
         // Cargar al iniciar
         cargarInventario();
+        cargarCroquis();
     </script>
 </body>
 </html>
