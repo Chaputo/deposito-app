@@ -391,11 +391,7 @@
                 `${sector}-${String(index + 1).padStart(2, '0')}`
             )
         );
-        const subsectoresOcultos = new Set(
-            (localStorage.getItem('depositoSubsectoresOcultos') || '')
-                .split(',')
-                .filter(ubicacion => ubicacionesFijas.includes(ubicacion))
-        );
+        const subsectoresOcultos = new Set();
         const coloresCroquis = {
             libre: localStorage.getItem('depositoColorLibre') || '#e5f5e9',
             ocupado: localStorage.getItem('depositoColorOcupado') || '#ffe5e5'
@@ -409,11 +405,31 @@
                 const resultado = await leerRespuesta(res);
                 if (!res.ok) throw new Error(resultado.error || 'No se pudo cargar el croquis.');
                 croquisGlobal = resultado;
+                const resVisibilidad = await fetch('/api/croquis/visibilidad');
+                const visibilidad = await leerRespuesta(resVisibilidad);
+                if (!resVisibilidad.ok) {
+                    throw new Error(visibilidad.error || 'No se pudo cargar la visibilidad del croquis.');
+                }
+
+                if (visibilidad.configurada) {
+                    subsectoresOcultos.clear();
+                    visibilidad.subsectoresOcultos
+                        .filter(ubicacion => ubicacionesFijas.includes(ubicacion))
+                        .forEach(ubicacion => subsectoresOcultos.add(ubicacion));
+                } else {
+                    (localStorage.getItem('depositoSubsectoresOcultos') || '')
+                        .split(',')
+                        .filter(ubicacion => ubicacionesFijas.includes(ubicacion))
+                        .forEach(ubicacion => subsectoresOcultos.add(ubicacion));
+                }
+
                 const ocupadas = new Set(croquisGlobal.palets.map(palet => palet.seccion));
                 const reaparecieron = Array.from(subsectoresOcultos).filter(ubicacion => ocupadas.has(ubicacion));
                 reaparecieron.forEach(ubicacion => subsectoresOcultos.delete(ubicacion));
+                if ((!visibilidad.configurada && subsectoresOcultos.size > 0) || reaparecieron.length > 0) {
+                    await guardarVisibilidad();
+                }
                 if (reaparecieron.length) {
-                    guardarVisibilidad();
                     mostrarErrorCroquis('Se mostraron de nuevo los lugares que ya tienen palets.');
                 } else {
                     document.getElementById('error-croquis').hidden = true;
@@ -685,8 +701,21 @@
             mostrarCroquis();
         }
 
+        let colaGuardadoVisibilidad = Promise.resolve();
+
         function guardarVisibilidad() {
-            localStorage.setItem('depositoSubsectoresOcultos', Array.from(subsectoresOcultos).join(','));
+            const subsectores = Array.from(subsectoresOcultos);
+            colaGuardadoVisibilidad = colaGuardadoVisibilidad.catch(() => {}).then(async () => {
+                const res = await fetch('/api/croquis/visibilidad', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ subsectoresOcultos: subsectores })
+                });
+                const resultado = await leerRespuesta(res);
+                if (!res.ok) throw new Error(resultado.error || 'No se pudo guardar la visibilidad del croquis.');
+                localStorage.removeItem('depositoSubsectoresOcultos');
+            });
+            return colaGuardadoVisibilidad;
         }
 
         function mostrarControlesVisibilidad() {
@@ -707,12 +736,17 @@
                 const nombre = document.createElement('span');
                 nombre.textContent = `${ubicacion.slice(-2)}${cantidadPalets ? ' · Ocupado' : ''}`;
                 etiqueta.append(casilla, nombre);
-                casilla.addEventListener('change', () => {
+                casilla.addEventListener('change', async () => {
                     if (casilla.checked) subsectoresOcultos.delete(ubicacion);
                     else subsectoresOcultos.add(ubicacion);
-                    guardarVisibilidad();
                     mostrarCroquis();
                     mostrarControlesVisibilidad();
+                    try {
+                        await guardarVisibilidad();
+                        document.getElementById('error-croquis').hidden = true;
+                    } catch (error) {
+                        mostrarErrorCroquis(error.message);
+                    }
                 });
                 opciones.appendChild(etiqueta);
             });
@@ -759,13 +793,18 @@
         );
         document.getElementById('abrir-visibilidad').addEventListener('click', abrirDialogVisibilidad);
         document.getElementById('sector-visibilidad').addEventListener('change', mostrarControlesVisibilidad);
-        document.getElementById('mostrar-todos-sector').addEventListener('click', () => {
+        document.getElementById('mostrar-todos-sector').addEventListener('click', async () => {
             ubicacionesFijas
                 .filter(ubicacion => ubicacion.startsWith(`${sectorVisibilidadSeleccionado}-`))
                 .forEach(ubicacion => subsectoresOcultos.delete(ubicacion));
-            guardarVisibilidad();
             mostrarCroquis();
             mostrarControlesVisibilidad();
+            try {
+                await guardarVisibilidad();
+                document.getElementById('error-croquis').hidden = true;
+            } catch (error) {
+                mostrarErrorCroquis(error.message);
+            }
         });
         document.getElementById('cerrar-visibilidad').addEventListener('click', () => {
             document.getElementById('dialog-visibilidad').hidden = true;

@@ -10,6 +10,7 @@ app.use(express.json());
 // CONFIGURACIÓN DE GOOGLE SHEETS
 const SPREADSHEET_ID = '1LqJSoz0hKBU9Xzeabtsn7TOdFoTIhWICzT6CtW74mEw'; // <-- Tu ID real
 const PALETS_SHEET = 'Croquis_Palets';
+const ID_CONFIG_VISIBILIDAD = '__CONFIG_VISIBILIDAD__';
 const ENCABEZADOS_CROQUIS = ['ID', 'Seccion', 'Producto', 'Cantidad', 'Notas'];
 const credentialsJson = process.env.GOOGLE_CREDENTIALS 
   ? JSON.parse(process.env.GOOGLE_CREDENTIALS) 
@@ -140,7 +141,7 @@ async function leerCroquis({ sheets, titulo, columnas, ancho }) {
   filas.forEach((fila, index) => {
     const id = fila[indice('id')] || '';
     const seccion = fila[indice('seccion')] || '';
-    if (id.startsWith('__SECCION__:')) return;
+    if (id.startsWith('__SECCION__:') || id === ID_CONFIG_VISIBILIDAD) return;
     if (!id) return;
 
     const productoTexto = String(fila[indice('producto')] || '');
@@ -166,6 +167,65 @@ async function leerCroquis({ sheets, titulo, columnas, ancho }) {
     secciones: Array.from(secciones),
     palets,
   };
+}
+
+async function leerVisibilidad(hoja) {
+  const response = await hoja.sheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range: rangoHoja(hoja.titulo, `A2:${columnaA1(hoja.ancho)}`),
+  });
+  const filas = response.data.values || [];
+  const indiceId = hoja.columnas.id;
+  const indiceNotas = hoja.columnas.notas;
+  const indice = filas.findIndex(fila => fila[indiceId] === ID_CONFIG_VISIBILIDAD);
+  if (indice < 0) return { configurada: false, subsectoresOcultos: [] };
+
+  const guardados = JSON.parse(filas[indice][indiceNotas] || '[]');
+  if (!Array.isArray(guardados)) {
+    throw new Error('La configuración de visibilidad del croquis no es válida.');
+  }
+  return {
+    configurada: true,
+    subsectoresOcultos: Array.from(new Set(guardados.filter(ubicacion =>
+      typeof ubicacion === 'string' && ubicacionValida(ubicacion)
+    ))),
+  };
+}
+
+async function guardarVisibilidad(hoja, subsectoresOcultos) {
+  const response = await hoja.sheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range: rangoHoja(hoja.titulo, `A2:${columnaA1(hoja.ancho)}`),
+  });
+  const filas = response.data.values || [];
+  const indiceId = hoja.columnas.id;
+  const indice = filas.findIndex(fila => fila[indiceId] === ID_CONFIG_VISIBILIDAD);
+  const fila = filaCroquis(hoja.columnas, hoja.ancho, {
+    id: ID_CONFIG_VISIBILIDAD,
+    seccion: '',
+    producto: '',
+    cantidad: '',
+    nota: JSON.stringify(subsectoresOcultos),
+  });
+
+  if (indice >= 0) {
+    const numeroFila = indice + 2;
+    await hoja.sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: rangoHoja(hoja.titulo, `A${numeroFila}:${columnaA1(hoja.ancho)}${numeroFila}`),
+      valueInputOption: 'RAW',
+      requestBody: { values: [fila] },
+    });
+    return;
+  }
+
+  await hoja.sheets.spreadsheets.values.append({
+    spreadsheetId: SPREADSHEET_ID,
+    range: rangoHoja(hoja.titulo, `A:${columnaA1(hoja.ancho)}`),
+    valueInputOption: 'RAW',
+    insertDataOption: 'INSERT_ROWS',
+    requestBody: { values: [fila] },
+  });
 }
 
 function validarPalet({ seccion, productoFila, cantidad, nota }) {
@@ -288,6 +348,34 @@ app.get('/api/croquis', async (req, res) => {
   } catch (error) {
     console.error('Error al cargar el croquis:', error);
     res.status(500).json({ error: error.message || 'No se pudo cargar el croquis del depósito.' });
+  }
+});
+
+app.get('/api/croquis/visibilidad', async (req, res) => {
+  try {
+    const hoja = await getPaletsSheet();
+    res.json(await leerVisibilidad(hoja));
+  } catch (error) {
+    console.error('Error al cargar la visibilidad del croquis:', error);
+    res.status(500).json({ error: error.message || 'No se pudo cargar la visibilidad del croquis.' });
+  }
+});
+
+app.put('/api/croquis/visibilidad', async (req, res) => {
+  const ocultos = req.body && req.body.subsectoresOcultos;
+  if (!Array.isArray(ocultos) ||
+      ocultos.some(ubicacion => typeof ubicacion !== 'string' || !ubicacionValida(ubicacion))) {
+    return res.status(400).json({ error: 'La lista de subsectores ocultos no es válida.' });
+  }
+
+  const subsectoresOcultos = Array.from(new Set(ocultos));
+  try {
+    const hoja = await getPaletsSheet();
+    await guardarVisibilidad(hoja, subsectoresOcultos);
+    res.json({ configurada: true, subsectoresOcultos });
+  } catch (error) {
+    console.error('Error al guardar la visibilidad del croquis:', error);
+    res.status(500).json({ error: error.message || 'No se pudo guardar la visibilidad del croquis.' });
   }
 });
 
