@@ -154,9 +154,11 @@
             <label class="block text-sm font-medium text-gray-700">Lugar del plano
                 <select id="palet-seccion" required class="mt-1 w-full p-2 border border-gray-300 rounded-lg bg-white"></select>
             </label>
-            <label class="block text-sm font-medium text-gray-700">Producto
-                <select id="palet-producto" class="mt-1 w-full p-2 border border-gray-300 rounded-lg bg-white"></select>
-            </label>
+            <label for="buscar-producto-palet" class="block text-sm font-medium text-gray-700">Producto</label>
+            <input id="buscar-producto-palet" type="search" placeholder="Filtrar por nombre, código o ID..."
+                aria-label="Buscar productos" class="mt-1 w-full p-2 border border-gray-300 rounded-lg">
+            <select id="palet-producto" aria-label="Seleccionar producto"
+                class="w-full p-2 border border-gray-300 rounded-lg bg-white"></select>
             <label class="block text-sm font-medium text-gray-700">Cantidad
                 <input id="palet-cantidad" type="number" min="0" step="any" required class="mt-1 w-full p-2 border border-gray-300 rounded-lg">
             </label>
@@ -181,6 +183,13 @@
             { clave: 'stockPalets', etiqueta: 'Palets' },
             { clave: 'stockPicking', etiqueta: 'Picking' }
         ];
+
+        function normalizarBusqueda(valor) {
+            return String(valor || '')
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase();
+        }
 
         async function leerRespuesta(res) {
             const tipo = res.headers.get('content-type') || '';
@@ -369,10 +378,10 @@
         }
 
         function filtrarProductos(texto = document.getElementById('buscador').value) {
-            const consulta = texto.toLowerCase();
+            const consulta = normalizarBusqueda(texto);
             const filtrados = productosGlobales.filter(p =>
                 [p.articulo, p.sku, p.ubicacion, p.codigoBarra, p.id]
-                    .some(valor => String(valor || '').toLowerCase().includes(consulta))
+                    .some(valor => normalizarBusqueda(valor).includes(consulta))
             );
             mostrarProductos(filtrados);
         }
@@ -593,6 +602,28 @@
             selector.value = seleccionada || '';
         }
 
+        function llenarSelectorProductos(texto = '', seleccionado = '') {
+            const consulta = normalizarBusqueda(texto);
+            const selector = document.getElementById('palet-producto');
+            selector.replaceChildren();
+
+            const sinProducto = document.createElement('option');
+            sinProducto.value = '';
+            sinProducto.textContent = 'Sin producto asignado';
+            selector.appendChild(sinProducto);
+
+            productosGlobales
+                .filter(producto => !consulta || [producto.articulo, producto.codigoBarra, producto.id]
+                    .some(valor => normalizarBusqueda(valor).startsWith(consulta)))
+                .forEach(producto => {
+                    const opcion = document.createElement('option');
+                    opcion.value = producto.fila;
+                    opcion.textContent = `${producto.articulo || 'Producto'}${producto.codigoBarra ? ` · ${producto.codigoBarra}` : ''}`;
+                    selector.appendChild(opcion);
+                });
+            selector.value = seleccionado;
+        }
+
         function abrirDialogPalet(palet, ubicacion, sinUbicacion = false) {
             paletEnEdicion = palet;
             ubicacionSeleccionada = ubicacion;
@@ -603,24 +634,13 @@
             document.getElementById('quitar-palet').hidden = !palet;
             llenarSelectorUbicacion(ubicacion || (palet && esUbicacionFija(palet.seccion) ? palet.seccion : ''), palet && palet.seccion);
 
-            const selectorProducto = document.getElementById('palet-producto');
-            selectorProducto.replaceChildren();
-            const sinProducto = document.createElement('option');
-            sinProducto.value = '';
-            sinProducto.textContent = 'Sin producto asignado';
-            selectorProducto.appendChild(sinProducto);
-            productosGlobales.forEach(producto => {
-                const opcion = document.createElement('option');
-                opcion.value = producto.fila;
-                opcion.textContent = `${producto.articulo || 'Producto'}${producto.codigoBarra ? ` · ${producto.codigoBarra}` : ''}`;
-                selectorProducto.appendChild(opcion);
-            });
-            selectorProducto.value = palet && palet.productoFila ? String(palet.productoFila) : '';
+            document.getElementById('buscar-producto-palet').value = '';
+            llenarSelectorProductos('', palet && palet.productoFila ? String(palet.productoFila) : '');
             document.getElementById('palet-cantidad').value = palet ? palet.cantidad : 0;
             document.getElementById('palet-nota').value = palet ? palet.nota : '';
             document.getElementById('error-palet').hidden = true;
             dialogPalet.hidden = false;
-            document.getElementById('palet-seccion').focus();
+            document.getElementById('buscar-producto-palet').focus();
         }
 
         function cerrarDialogPalet() {
@@ -793,6 +813,9 @@
         );
         document.getElementById('abrir-visibilidad').addEventListener('click', abrirDialogVisibilidad);
         document.getElementById('sector-visibilidad').addEventListener('change', mostrarControlesVisibilidad);
+        document.getElementById('buscar-producto-palet').addEventListener('input', evento => {
+            llenarSelectorProductos(evento.target.value);
+        });
         document.getElementById('mostrar-todos-sector').addEventListener('click', async () => {
             ubicacionesFijas
                 .filter(ubicacion => ubicacion.startsWith(`${sectorVisibilidadSeleccionado}-`))
